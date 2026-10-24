@@ -1,0 +1,6 @@
+{
+  "name": "PlanStrike: Blueprint CQB",
+  "description": "2D top-down tactical CQB shooter that instantly converts any architectural floor plan into a dynamic combat arena with automatic wall recognition, cover systems, and intelligent enemy AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
