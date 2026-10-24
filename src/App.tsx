@@ -103,6 +103,9 @@ export default function App() {
     });
     map.name = targetPreset.name;
     map.description = targetPreset.description;
+    if (targetPreset.defaultSpawn) {
+      map.playerSpawn = { ...targetPreset.defaultSpawn };
+    }
     startGameWithMap(map);
   };
 

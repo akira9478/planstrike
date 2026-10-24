@@ -10,6 +10,7 @@ export interface FloorPlanPreset {
   category: string;
   description: string;
   thumbnailUrl: string;
+  defaultSpawn?: { x: number; y: number; angle: number };
   generateImage: () => Promise<HTMLImageElement>;
 }
 
@@ -349,6 +350,7 @@ export const MAP_PRESETS: FloorPlanPreset[] = [
     category: '住宅格局',
     description: '經典 3 房 2 廳格局，寬敞客廳與開放式中島廚房，多重進攻與架槍視角。',
     thumbnailUrl: '',
+    defaultSpawn: { x: 240, y: 1350, angle: -Math.PI / 2 },
     generateImage: generatePenthouseImage,
   },
   {
@@ -357,6 +359,7 @@ export const MAP_PRESETS: FloorPlanPreset[] = [
     category: '商務格局',
     description: '開放式辦公卡座、會議室與機房金庫，包含狹長走道與高掩護密度戰區。',
     thumbnailUrl: '',
+    defaultSpawn: { x: 800, y: 1350, angle: -Math.PI / 2 },
     generateImage: generateOfficeImage,
   },
   {
@@ -365,6 +368,7 @@ export const MAP_PRESETS: FloorPlanPreset[] = [
     category: '特警突擊',
     description: '專為 CQB 室內近身格鬥設計的戰術訓練場，充滿死角障礙、木質掩體與盲區。',
     thumbnailUrl: '',
+    defaultSpawn: { x: 180, y: 800, angle: 0 },
     generateImage: generateKillhouseImage,
   },
   {
@@ -373,6 +377,7 @@ export const MAP_PRESETS: FloorPlanPreset[] = [
     category: '獨棟住宅',
     description: '雙進車庫、中央挑高走廊與環形房間配置，考驗拐角清房技巧。',
     thumbnailUrl: '',
+    defaultSpawn: { x: 320, y: 1350, angle: -Math.PI / 2 },
     generateImage: generateVillaImage,
   },
 ];

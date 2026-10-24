@@ -160,14 +160,58 @@ export async function parseFloorPlanFromImage(
   // If no open cluster found, create default center spawn
   const mainCluster = openClusters[0] || [{ x: Math.floor(gridSize / 2), y: Math.floor(gridSize / 2) }];
 
-  // Find Player Spawn: Choose an open cell near an edge (Entry/Breach)
-  let bestSpawn = mainCluster[0];
-  let minEdgeDist = Infinity;
+  // Calculate clearance (distance to nearest wall cell) for every open cell
+  const clearance: number[][] = Array.from({ length: gridSize }, () => new Array(gridSize).fill(0));
+  for (let y = 1; y < gridSize - 1; y++) {
+    for (let x = 1; x < gridSize - 1; x++) {
+      if (cleanedGrid[y][x] === 0) {
+        let r = 1;
+        let isClear = true;
+        while (isClear && r <= 5) {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              const ny = y + dy;
+              const nx = x + dx;
+              if (ny < 0 || ny >= gridSize || nx < 0 || nx >= gridSize || cleanedGrid[ny][nx] === 1) {
+                isClear = false;
+                break;
+              }
+            }
+            if (!isClear) break;
+          }
+          if (isClear) r++;
+        }
+        clearance[y][x] = r - 1;
+      }
+    }
+  }
+
+  // Find Player Spawn: Choose a spacious open cell with high clearance (>= 2 cells away from any wall)
+  let bestSpawn = mainCluster[Math.floor(mainCluster.length / 2)] || { x: Math.floor(gridSize / 2), y: Math.floor(gridSize / 2) };
+  let bestScore = -Infinity;
+
   for (const pt of mainCluster) {
-    const distToEdge = Math.min(pt.x, gridSize - 1 - pt.x, pt.y, gridSize - 1 - pt.y);
-    if (distToEdge >= 3 && distToEdge < minEdgeDist) {
-      minEdgeDist = distToEdge;
+    const clr = clearance[pt.y][pt.x];
+    if (clr < 1) continue; // Skip cells touching walls!
+
+    // Prefer cells with high clearance and comfortable entrance positioning
+    const score = clr * 12 - (pt.y < gridSize / 4 ? 5 : 0);
+    if (score > bestScore) {
+      bestScore = score;
       bestSpawn = pt;
+    }
+  }
+
+  // Fallback if no cell has clr >= 1: find absolute maximum clearance cell on entire map
+  if (clearance[bestSpawn.y]?.[bestSpawn.x] === 0) {
+    let maxClr = -1;
+    for (let y = 1; y < gridSize - 1; y++) {
+      for (let x = 1; x < gridSize - 1; x++) {
+        if (clearance[y][x] > maxClr) {
+          maxClr = clearance[y][x];
+          bestSpawn = { x, y };
+        }
+      }
     }
   }
 

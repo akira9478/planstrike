@@ -83,6 +83,7 @@ export class GameEngine {
 
     // Initialize Player
     this.player = this.createDefaultPlayer(map.playerSpawn);
+    this.unstickPlayerIfColliding();
 
     // Initialize Enemies from map
     this.initEnemies();
@@ -516,17 +517,14 @@ export class GameEngine {
     const nextX = this.player.x + moveX * currentSpeed * dt;
     const nextY = this.player.y + moveY * currentSpeed * dt;
 
-    // Wall collision with slide response
+    // Apply movement with continuous slide collision & de-penetration
     const radius = 14;
+    this.player.x = nextX;
+    this.player.y = nextY;
 
-    // Check X axis movement
-    if (!this.checkWallCollision(nextX, this.player.y, radius)) {
-      this.player.x = nextX;
-    }
-    // Check Y axis movement
-    if (!this.checkWallCollision(this.player.x, nextY, radius)) {
-      this.player.y = nextY;
-    }
+    const resolved = this.resolveWallCollisions(this.player.x, this.player.y, radius);
+    this.player.x = resolved.x;
+    this.player.y = resolved.y;
 
     // Keep inside bounds
     this.player.x = Math.max(radius + 10, Math.min(this.map.width - radius - 10, this.player.x));
@@ -917,16 +915,12 @@ export class GameEngine {
   }
 
   private moveEnemy(enemy: Enemy, dx: number, dy: number) {
-    const nextX = enemy.x + dx;
-    const nextY = enemy.y + dy;
     const radius = 13;
-
-    if (!this.checkWallCollision(nextX, enemy.y, radius)) {
-      enemy.x = nextX;
-    }
-    if (!this.checkWallCollision(enemy.x, nextY, radius)) {
-      enemy.y = nextY;
-    }
+    enemy.x += dx;
+    enemy.y += dy;
+    const resolved = this.resolveWallCollisions(enemy.x, enemy.y, radius);
+    enemy.x = resolved.x;
+    enemy.y = resolved.y;
   }
 
   private enemyFire(enemy: Enemy) {
@@ -1002,6 +996,101 @@ export class GameEngine {
     }
 
     return false;
+  }
+
+  /**
+   * Continuous circle-vs-box pushback and sliding resolution.
+   * Completely eliminates getting stuck on walls or corners!
+   */
+  public resolveWallCollisions(px: number, py: number, radius: number): { x: number; y: number } {
+    const cellSize = this.map.cellSize;
+    let resX = px;
+    let resY = py;
+
+    // Run relaxation passes for corner handling
+    for (let iter = 0; iter < 3; iter++) {
+      const minGridX = Math.max(0, Math.floor((resX - radius - 1) / cellSize));
+      const maxGridX = Math.min(this.map.gridWidth - 1, Math.floor((resX + radius + 1) / cellSize));
+      const minGridY = Math.max(0, Math.floor((resY - radius - 1) / cellSize));
+      const maxGridY = Math.min(this.map.gridHeight - 1, Math.floor((resY + radius + 1) / cellSize));
+
+      for (let gy = minGridY; gy <= maxGridY; gy++) {
+        for (let gx = minGridX; gx <= maxGridX; gx++) {
+          if (this.map.grid[gy][gx] === 1) {
+            const boxMinX = gx * cellSize;
+            const boxMaxX = (gx + 1) * cellSize;
+            const boxMinY = gy * cellSize;
+            const boxMaxY = (gy + 1) * cellSize;
+
+            const closestX = Math.max(boxMinX, Math.min(resX, boxMaxX));
+            const closestY = Math.max(boxMinY, Math.min(resY, boxMaxY));
+
+            const dx = resX - closestX;
+            const dy = resY - closestY;
+            const distSq = dx * dx + dy * dy;
+
+            if (distSq < radius * radius) {
+              if (distSq > 0.001) {
+                const dist = Math.sqrt(distSq);
+                const overlap = radius - dist;
+                resX += (dx / dist) * overlap;
+                resY += (dy / dist) * overlap;
+              } else {
+                // If center is completely inside wall cell, push to nearest edge
+                const dLeft = Math.abs(resX - boxMinX);
+                const dRight = Math.abs(boxMaxX - resX);
+                const dTop = Math.abs(resY - boxMinY);
+                const dBottom = Math.abs(boxMaxY - resY);
+                const minD = Math.min(dLeft, dRight, dTop, dBottom);
+                if (minD === dLeft) resX = boxMinX - radius - 1;
+                else if (minD === dRight) resX = boxMaxX + radius + 1;
+                else if (minD === dTop) resY = boxMinY - radius - 1;
+                else resY = boxMaxY + radius + 1;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { x: resX, y: resY };
+  }
+
+  /**
+   * Ensures the entity is placed in a clean, open room if the initial coordinates
+   * overlap with a wall block.
+   */
+  private unstickPlayerIfColliding() {
+    const radius = 14;
+    // Step 1: try physics pushback
+    const resolved = this.resolveWallCollisions(this.player.x, this.player.y, radius + 2);
+    this.player.x = resolved.x;
+    this.player.y = resolved.y;
+
+    // Step 2: if still colliding, search outward in spiral for open clearance
+    if (this.checkWallCollision(this.player.x, this.player.y, radius)) {
+      const cellSize = this.map.cellSize;
+      let found = false;
+
+      for (let r = 1; r <= 30 && !found; r++) {
+        for (let dy = -r; dy <= r && !found; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+            const candX = this.player.x + dx * cellSize;
+            const candY = this.player.y + dy * cellSize;
+
+            if (candX > 40 && candX < this.map.width - 40 && candY > 40 && candY < this.map.height - 40) {
+              if (!this.checkWallCollision(candX, candY, radius + 4)) {
+                this.player.x = candX;
+                this.player.y = candY;
+                found = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   private updateParticles(dt: number) {
